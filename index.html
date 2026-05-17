@@ -1,527 +1,528 @@
-html lang="ja">
+<!DOCTYPE html>
+<html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ワールドトリガーVRトレーニング</title>
-<script src=" https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js "></script>
-<!-- VRボタンコンポーネント -->
-<script src=" https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js "></script>
-<script src=" https://cdn.tailwindcss.com "></script>
-<style>
-body { margin: 0; overflow: hidden; background-color: #001a1a; font-family: 'Helvetica Neue', Arial, sans-serif; }
-#ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Trigger VR Training</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- VR Button Component -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/BufferGeometryUtils.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #001a1a; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        
+        /* Non-VR HUD */
+        .hud-panel {
+            background: rgba(0, 20, 20, 0.7);
+            border: 2px solid #00cccc;
+            color: #00ffff;
+            padding: 10px;
+            border-radius: 8px;
+            pointer-events: all;
+        }
 
-/* 非VR HUD */
-.hud-panel {
-背景: rgba(0, 20, 20, 0.7);
-border: 2px solid #00cccc;
-色: #00ffff;
-パディング: 10px;
-ボーダー半径: 8px;
-ポインターイベント: すべて;
-}
+        #hp-bar-container { 
+            position: absolute; bottom: 30px; left: 50%; 
+            transform: translateX(-50%); 
+            width: 300px; height: 16px; 
+            border: 2px solid #008888; background: #002222; 
+            border-radius: 8px; overflow: hidden;
+        }
+        #hp-bar { height: 100%; background: linear-gradient(90deg, #00cccc, #00ffff); width: 100%; transition: width 0.1s; }
 
-#hp-bar-container {
-position: absolute; bottom: 30px; left: 50%;
-変換: translateX(-50%);
-幅: 300px; 高さ: 16px;
-border: 2px solid #008888; background: #002222;
-border-radius: 8px; overflow: hidden;
-}
-#hp-bar { height: 100%; background: linear-gradient(90deg, #00cccc, #00ffff); width: 100%; transition: width 0.1s; }
+        #menu-overlay { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: radial-gradient(circle, #003333 0%, #000000 100%); 
+            pointer-events: all; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; z-index: 100; color: #fff; 
+        }
+        
+        #msg-box { 
+            position: absolute; top: 40%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            font-size: 60px; font-weight: bold; color: #ff4444; 
+            display: none; text-shadow: 0 0 20px rgba(255,0,0,0.5); 
+        }
 
-#menu-overlay {
-position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-背景: 放射状グラデーション(円、#003333 0%、#000000 100%);
-pointer-events: all; display: flex; flex-direction: column;
-align-items: center; justify-content: center; z-index: 100; color: #fff;
-}
-
-#msg-box {
-位置: 絶対; 上: 40%; 左: 50%;
-transform: translate(-50%, -50%);
-フォントサイズ: 60px; フォントの太さ: 太字; 色: #ff4444;
-display: none; text-shadow: 0 0 20px rgba(255,0,0,0.5);
-}
-
-.vr-btn {
-position: absolute; bottom: 20px; right: 20px;
-padding: 12px 24px; background: #00cccc; color: white;
-border: none; border-radius: 4px; font-weight: bold; cursor: pointer;
-ポインターイベント: すべて; z-index: 1000;
-}
-</style>
+        .vr-btn {
+            position: absolute; bottom: 20px; right: 20px;
+            padding: 12px 24px; background: #00cccc; color: white;
+            border: none; border-radius: 4px; font-weight: bold; cursor: pointer;
+            pointer-events: all; z-index: 1000;
+        }
+    </style>
 </head>
 <body>
 
 <div id="menu-overlay">
-<h1 class="text-4xl mb-8 text-cyan-400 font-black tracking-widest">VRトリガーシステム</h1>
-<p class="mb-4 text-シアン-200">ヘッドセットを接続して「ENTER VR」を押しか、PC で開始してください</p>
-<div class="flex gap-12 mb-8">
-<div class="p-6 bg-black/50 rounded-xl border border-cyan-500/30">
-<h2 class="text-xl mb-4 text-center font-bold text-cyan-400">メイン（右手）</h2>
-<div id="main-slots-config"></div>
-</div>
-<div class="p-6 bg-black/50 rounded-xl border border-cyan-500/30">
-<h2 class="text-xl mb-4 text-center font-bold text-cyan-400">SUB（左手）</h2>
-<div id="sub-slots-config"></div>
-</div>
-</div>
-<button id="start-btn" class="px-12 py-4 bg-cyan-600 text-white font-bold rounded-full hover:bg-cyan-500 transition-all shadow-lg uppercase tracking-widest">システムを起動</button>
+    <h1 class="text-4xl mb-8 text-cyan-400 font-black tracking-widest">VR TRIGGER SYSTEM</h1>
+    <p class="mb-4 text-cyan-200">ヘッドセットを接続して「ENTER VR」を押すか、PCで開始してください</p>
+    <div class="flex gap-12 mb-8">
+        <div class="p-6 bg-black/50 rounded-xl border border-cyan-500/30">
+            <h2 class="text-xl mb-4 text-center font-bold text-cyan-400">MAIN (Right Hand)</h2>
+            <div id="main-slots-config"></div>
+        </div>
+        <div class="p-6 bg-black/50 rounded-xl border border-cyan-500/30">
+            <h2 class="text-xl mb-4 text-center font-bold text-cyan-400">SUB (Left Hand)</h2>
+            <div id="sub-slots-config"></div>
+        </div>
+    </div>
+    <button id="start-btn" class="px-12 py-4 bg-cyan-600 text-white font-bold rounded-full hover:bg-cyan-500 transition-all shadow-lg uppercase tracking-widest">Start System</button>
 </div>
 
 <div id="ui-layer">
-<div id="hp-bar-container">
-<div id="hp-bar"></div>
-<div class="absolute -t​​op-6 left-0 text-cyan-400 text-xs font-bold">トリオンレベル</div>
-</div>
-<div id="msg-box">脱出</div>
+    <div id="hp-bar-container">
+        <div id="hp-bar"></div>
+        <div class="absolute -top-6 left-0 text-cyan-400 text-xs font-bold">TRION LEVEL</div>
+    </div>
+    <div id="msg-box">BAIL OUT</div>
 </div>
 
 <script type="module">
-// VRButtonユーティリティのシミュレーション。外部モジュールを1つのファイルに簡単にインポートできないため。
-function createVRButton(renderer) {
-const button = document.createElement('button');
-button.className = 'vr-btn';
-button.textContent = 'VRに入る';
+    // VRButton utility simulation since we can't import external modules easily in one file
+    function createVRButton(renderer) {
+        const button = document.createElement('button');
+        button.className = 'vr-btn';
+        button.textContent = 'ENTER VR';
+        
+        button.onclick = () => {
+            if (navigator.xr) {
+                navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers'] })
+                .then((session) => {
+                    renderer.xr.setSession(session);
+                    button.textContent = 'VR ACTIVE';
+                });
+            } else {
+                alert("WebXR not supported");
+            }
+        };
+        document.body.appendChild(button);
+    }
 
-button.onclick = () => {
-if (navigator.xr) {
-navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers'] })
-.then((session) => {
-renderer.xr.setSession(session);
-button.textContent = 'VRアクティブ';
-});
-} それ以外 {
-alert("WebXRはサポートされていません");
-}
-};
-document.body.appendChild(button);
-}
+    const WEAPONS = {
+        NONE: { name: "EMPTY", cost: 0, type: 'none' },
+        KOGETSU: { name: "弧月", cost: 0.1, type: 'sword_std', cooldown: 0.3, damage: 60, range: 7.0 },
+        RAYGUST: { name: "レイガスト", cost: 0, type: 'sword', cooldown: 0.4, damage: 45, range: 6.0 },
+        SCORPION: { name: "スコーピオン", cost: 0.2, type: 'blade', cooldown: 0.1, damage: 35, range: 4.5 },
+        ASTEROID: { name: "アステロイド", cost: 1.0, type: 'bullet' },
+        SHIELD: { name: "シールド", cost: 0.1, type: 'shield' },
+        GRASSHOPPER: { name: "グラスホッパー", cost: 0.4, type: 'jump' }
+    };
 
-const WEAPONS = {
-なし: { 名前: "EMPTY", コスト: 0, タイプ: 'none' },
-KOGETSU: { name: "弧月", cost: 0.1, type: 'sword_std', cooldown: 0.3, damage: 60, range: 7.0 },
-レイガスト: { 名前: "レイガスト"、コスト: 0、タイプ: 'ソード'、クールダウン: 0.4、ダメージ: 45、射程: 6.0 }、
-スコーピオン: { 名前: "スコーピオン"、コスト: 0.2、タイプ: 'ブレード'、クールダウン: 0.1、ダメージ: 35、射程: 4.5 }、
-ASTEROID: { 名前: "アステロイド"、コスト: 1.0、タイプ: '弾丸' }、
-SHIELD: { 名前: "シールド"、コスト: 0.1、タイプ: 'シールド' },
-グラスホッパー: { 名前: "グラスホッパー"、コスト: 0.4、タイプ: 'ジャンプ' }
-};
+    let config = {
+        main: ["KOGETSU", "ASTEROID", "SHIELD", "GRASSHOPPER"],
+        sub: ["SCORPION", "RAYGUST", "SHIELD", "NONE"]
+    };
 
-let config = {
-メイン: ["KOGETSU", "ASTEROID", "SHIELD", "GRASSHOPPER"]、
-サブ: ["スコーピオン", "レイガスト", "シールド", "なし"]
-};
+    let activeSlots = { main: 0, sub: 0 };
+    let hp = 100;
+    let isGameOver = false;
 
-let activeSlots = { main: 0, sub: 0​​ };
-hp = 100とする。
-let isGameOver = false;
+    let scene, camera, renderer, clock;
+    let player, playerGroup, playerVelocity = new THREE.Vector3();
+    let moveState = { forward: 0, right: 0 };
+    let canJump = true;
+    
+    let bullets = [];
+    let enemies = [];
+    let particles = [];
+    
+    // VR Controllers
+    let controller1, controller2;
+    let controllerGrip1, controllerGrip2;
+    let weaponsInHand = { left: null, right: null };
+    let charging = { left: false, right: false, time: { left: 0, right: 0 } };
+    let cooldowns = { left: 0, right: 0 };
 
-シーン、カメラ、レンダラー、クロックを定義
-let player, playerGroup, playerVelocity = new THREE.Vector3();
-let moveState = { forward: 0, right: 0 };
-let canJump = true;
+    function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000505);
+        scene.fog = new THREE.Fog(0x000505, 20, 150);
 
-let bullets = [];
-let enemies = [];
-let particles = [];
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.xr.enabled = true; // VR Enable
+        document.body.appendChild(renderer.domElement);
 
-// VRコントローラー
-let controller1, controller2;
-let controllerGrip1, controllerGrip2;
-let weaponsInHand = { left: null, right: null };
-let charging = { left: false, right: false, time: { left: 0, right: 0 } };
-let cooldowns = { left: 0, right: 0 };
+        createVRButton(renderer);
 
-function init() {
-scene = new THREE.Scene();
-scene.background = new THREE.Color(0x000505);
-scene.fog = new THREE.Fog(0x000505, 20, 150);
+        clock = new THREE.Clock();
 
-camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        scene.add(new THREE.AmbientLight(0x404040, 1.0));
+        const light = new THREE.PointLight(0x00ffff, 1, 100);
+        light.position.set(0, 10, 0);
+        scene.add(light);
 
-renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.xr.enabled = true; // VRを有効にする
-document.body.appendChild(renderer.domElement);
+        // Ground with cyber grid
+        const grid = new THREE.GridHelper(200, 40, 0x004444, 0x002222);
+        scene.add(grid);
+        
+        playerGroup = new THREE.Group();
+        scene.add(playerGroup);
+        playerGroup.add(camera);
 
-createVRButton(renderer);
+        // Controllers setup
+        controller1 = renderer.xr.getController(0); // Right
+        controller1.addEventListener('selectstart', () => startWeapon('right'));
+        controller1.addEventListener('selectend', () => releaseWeapon('right'));
+        playerGroup.add(controller1);
 
-clock = new THREE.Clock();
+        controller2 = renderer.xr.getController(1); // Left
+        controller2.addEventListener('selectstart', () => startWeapon('left'));
+        controller2.addEventListener('selectend', () => releaseWeapon('left'));
+        playerGroup.add(controller2);
 
-scene.add(new THREE.AmbientLight(0x404040, 1.0));
-const light = new THREE.PointLight(0x00ffff, 1, 100);
-light.position.set(0, 10, 0);
-scene.add(light);
+        // Visual for controllers
+        const handGeo = new THREE.BoxGeometry(0.05, 0.05, 0.1);
+        const handMat = new THREE.MeshBasicMaterial({ color: 0x00cccc });
+        controller1.add(new THREE.Mesh(handGeo, handMat));
+        controller2.add(new THREE.Mesh(handGeo, handMat));
 
-// サイバーグリッドを備えた地面
-const grid = new THREE.GridHelper(200, 40, 0x004444, 0x002222);
-scene.add(grid);
+        for(let i=0; i<8; i++) spawnEnemy();
 
-playerGroup = new THREE.Group();
-scene.add(playerGroup);
-playerGroup.add(camera);
+        setupMenu();
+        setupDesktopControls();
+        
+        renderer.setAnimationLoop(render);
+    }
 
-// コントローラーの設定
-controller1 = renderer.xr.getController(0); // 右
-controller1.addEventListener('selectstart', () => startWeapon('right'));
-controller1.addEventListener('selectend', () => releaseWeapon('right'));
-playerGroup.add(controller1);
+    function spawnEnemy() {
+        const x = (Math.random()-0.5)*80;
+        const z = (Math.random()-0.5)*80;
+        const enemy = new THREE.Group();
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(1, 2, 1), 
+            new THREE.MeshPhongMaterial({ color: 0xff3333, emissive: 0x330000 })
+        );
+        enemy.add(body);
+        enemy.position.set(x, 1, z);
+        enemy.userData = { hp: 100, shootTimer: 2 + Math.random() * 3 };
+        scene.add(enemy);
+        enemies.push(enemy);
+    }
 
-controller2 = renderer.xr.getController(1); // 左
-controller2.addEventListener('selectstart', () => startWeapon('left'));
-controller2.addEventListener('selectend', () => releaseWeapon('left'));
-playerGroup.add(controller2);
+    function setupMenu() {
+        const mainConfigDiv = document.getElementById('main-slots-config');
+        const subConfigDiv = document.getElementById('sub-slots-config');
+        const createSelect = (side, i) => {
+            const select = document.createElement('select');
+            select.className = "w-full mb-2 bg-black text-cyan-400 border border-cyan-800 rounded p-1 text-xs";
+            Object.keys(WEAPONS).forEach(key => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = WEAPONS[key].name;
+                if(config[side][i] === key) opt.selected = true;
+                select.appendChild(opt);
+            });
+            select.onchange = (e) => config[side][i] = e.target.value;
+            return select;
+        };
+        [0, 1, 2, 3].forEach(i => mainConfigDiv.appendChild(createSelect('main', i)));
+        [0, 1, 2, 3].forEach(i => subConfigDiv.appendChild(createSelect('sub', i)));
 
-// コントローラーのビジュアル
-const handGeo = new THREE.BoxGeometry(0.05, 0.05, 0.1);
-const handMat = new THREE.MeshBasicMaterial({ color: 0x00cccc });
-controller1.add(new THREE.Mesh(handGeo, handMat));
-controller2.add(new THREE.Mesh(handGeo, handMat));
+        document.getElementById('start-btn').onclick = () => {
+            document.getElementById('menu-overlay').style.display = 'none';
+            if (!renderer.xr.isPresenting) {
+                document.body.requestPointerLock();
+            }
+        };
+    }
 
-for(let i=0; i<8; i++) spawnEnemy();
+    function setupDesktopControls() {
+        window.addEventListener('keydown', (e) => {
+            if(isGameOver) return;
+            switch(e.code) {
+                case 'KeyW': moveState.forward = 1; break;
+                case 'KeyS': moveState.forward = -1; break;
+                case 'KeyA': moveState.right = -1; break;
+                case 'KeyD': moveState.right = 1; break;
+                case 'Space': if(canJump) playerVelocity.y = 8; break;
+                // Desktop slot switching
+                case 'Digit1': activeSlots.main = 0; break;
+                case 'Digit2': activeSlots.main = 1; break;
+                case 'Digit5': activeSlots.sub = 0; break;
+                case 'Digit6': activeSlots.sub = 1; break;
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if(e.code === 'KeyW' || e.code === 'KeyS') moveState.forward = 0;
+            if(e.code === 'KeyA' || e.code === 'KeyD') moveState.right = 0;
+        });
+        window.addEventListener('mousedown', (e) => {
+            if(!renderer.xr.isPresenting) {
+                if(e.button === 0) startWeapon('right');
+                if(e.button === 2) startWeapon('left');
+            }
+        });
+        window.addEventListener('mouseup', (e) => {
+            if(!renderer.xr.isPresenting) {
+                if(e.button === 0) releaseWeapon('right');
+                if(e.button === 2) releaseWeapon('left');
+            }
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement === document.body) {
+                playerGroup.rotation.y -= e.movementX * 0.002;
+                camera.rotation.x -= e.movementY * 0.002;
+                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+            }
+        });
+    }
 
-セットアップメニュー();
-setupDesktopControls();
+    // --- Core Action Logic ---
 
-renderer.setAnimationLoop(render);
-}
+    function startWeapon(hand) {
+        if(cooldowns[hand] > 0) return;
+        const slotIdx = hand === 'right' ? activeSlots.main : activeSlots.sub;
+        const weaponId = hand === 'right' ? config.main[slotIdx] : config.sub[slotIdx];
+        const weapon = WEAPONS[weaponId];
+        if(!weapon || weaponId === 'NONE') return;
 
-function spawnEnemy() {
-const x = (Math.random()-0.5)*80;
-const z = (Math.random()-0.5)*80;
-const enemy = new THREE.Group();
-const body = new THREE.Mesh(
-新しいTHREE.BoxGeometry(1, 2, 1)、
-新しいTHREE.MeshPhongMaterial({ color: 0xff3333, emissive: 0x330000 })
-);
-敵.add(body);
-enemy.position.set(x, 1, z);
-enemy.userData = { hp: 100, shootTimer: 2 + Math.random() * 3 };
-scene.add(enemy);
-敵をプッシュする;
-}
+        charging[hand] = true;
+        charging.time[hand] = 0;
 
-function setupMenu() {
-const mainConfigDiv = document.getElementById('main-slots-config');
-const subConfigDiv = document.getElementById('sub-slots-config');
-const createSelect = (side, i) => {
-const select = document.createElement('select');
-select.className = "w-full mb-2 bg-black text-cyan-400 border border-cyan-800 rounded p-1 text-xs";
-Object.keys(WEAPONS).forEach(key => {
-const opt = document.createElement('option');
-opt.value = key;
-opt.textContent = WEAPONS[key].name;
-if(config[side][i] === key) opt.selected = true;
-select.appendChild(opt);
-});
-select.onchange = (e) => config[side][i] = e.target.value;
-選択を返します。
-};
-[0, 1, 2, 3].forEach(i => mainConfigDiv.appendChild(createSelect('main', i)));
-[0, 1, 2, 3].forEach(i => subConfigDiv.appendChild(createSelect('sub', i)));
+        if(hp < weapon.cost) return;
+        hp -= weapon.cost;
+        updateHPUI();
 
-document.getElementById('start-btn').onclick = () => {
-document.getElementById('menu-overlay').style.display = 'none';
-if (!renderer.xr.isPresenting) {
-document.body.requestPointerLock();
-}
-};
-}
+        const controller = hand === 'right' ? controller1 : controller2;
 
-function setupDesktopControls() {
-window.addEventListener('keydown', (e) => {
-if(isGameOver) return;
-switch(e.code) {
-case 'KeyW': moveState.forward = 1; break;
-case 'KeyS': moveState.forward = -1; break;
-case 'KeyA': moveState.right = -1; break;
-case 'KeyD': moveState.right = 1; break;
-case 'Space': if(canJump) playerVelocity.y = 8; break;
-// デスクトップスロットの切り替え
-case 'Digit1': activeSlots.main = 0; break;
-case 'Digit2': activeSlots.main = 1; break;
-case 'Digit5': activeSlots.sub = 0; break;
-case 'Digit6': activeSlots.sub = 1; break;
-}
-});
-window.addEventListener('keyup', (e) => {
-if(e.code === 'KeyW' || e.code === 'KeyS') moveState.forward = 0;
-if(e.code === 'KeyA' || e.code === 'KeyD') moveState.right = 0;
-});
-window.addEventListener('mousedown', (e) => {
-if(!renderer.xr.isPresenting) {
-if(e.button === 0) startWeapon('right');
-if(e.button === 2) startWeapon('left');
-}
-});
-window.addEventListener('mouseup', (e) => {
-if(!renderer.xr.isPresenting) {
-if(e.button === 0) releaseWeapon('right');
-if(e.button === 2) releaseWeapon('left');
-}
-});
-window.addEventListener('mousemove', (e) => {
-if (document.pointerLockElement === document.body) {
-playerGroup.rotation.y -= e.movementX * 0.002;
-camera.rotation.x -= e.movementY * 0.002;
-camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-}
-});
-}
+        switch(weapon.type) {
+            case 'shield': createShield(hand, controller); break;
+            case 'sword': createBladeMesh(hand, controller, 0x00ffff, 4); break;
+            case 'sword_std': createBladeMesh(hand, controller, 0xffffff, 5); break;
+            case 'blade': createBladeMesh(hand, controller, 0x00ff00, 3); break;
+            case 'bullet': createBulletPre(hand, controller); break;
+            case 'jump': performJump(hand); break;
+        }
+    }
 
-// --- コアアクションロジック ---
+    function releaseWeapon(hand) {
+        if(!charging[hand]) return;
+        const slotIdx = hand === 'right' ? activeSlots.main : activeSlots.sub;
+        const weaponId = hand === 'right' ? config.main[slotIdx] : config.sub[slotIdx];
+        const weapon = WEAPONS[weaponId];
+        const holdTime = charging.time[hand];
+        charging[hand] = false;
 
-function startWeapon(hand) {
-if(cooldowns[hand] > 0) return;
-const slotIdx = hand === 'right' ? activeSlots.main : activeSlots.sub;
-const weaponId = hand === 'right' ? config.main[slotIdx] : config.sub[slotIdx];
-const weapon = WEAPONS[weaponId];
-if(!weapon || weaponId === 'NONE') return;
+        const controller = hand === 'right' ? controller1 : controller2;
 
-充電[手] = true;
-充電時間[手] = 0;
+        if(weapon.type === 'sword_std' || weapon.type === 'sword') {
+            if(holdTime > 0.5) fireWave(hand, controller, weapon.type === 'sword_std' ? 0xffffff : 0x00ffff);
+            else performMelee(hand, controller, weapon.damage, weapon.range);
+        } else if(weapon.type === 'blade') {
+            performMelee(hand, controller, weapon.damage, weapon.range);
+        } else if(weapon.type === 'bullet') {
+            fireBullets(hand, controller);
+        }
 
-if(hp < weapon.cost) return;
-hp -= weapon.cost;
-updateHPUI();
+        if(weapon.type !== 'shield') {
+            removeHandMesh(hand);
+            cooldowns[hand] = weapon.cooldown;
+        }
+    }
 
-const controller = hand === 'right' ? controller1 : controller2;
+    function createShield(hand, parent) {
+        removeHandMesh(hand);
+        const geo = new THREE.RingGeometry(0.5, 0.6, 32);
+        const mat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
+        const shield = new THREE.Mesh(geo, mat);
+        shield.rotation.x = Math.PI/2;
+        parent.add(shield);
+        weaponsInHand[hand] = shield;
+    }
 
-switch(weapon.type) {
-case 'shield': createShield(hand, controller); break;
-case 'sword': createBladeMesh(hand, controller, 0x00ffff, 4); break;
-case 'sword_std': createBladeMesh(hand, controller, 0xffffff, 5); break;
-case 'blade': createBladeMesh(hand, controller, 0x00ff00, 3); break;
-case 'bullet': createBulletPre(hand, controller); break;
-case 'jump': performJump(hand); break;
-}
-}
+    function createBladeMesh(hand, parent, color, length) {
+        removeHandMesh(hand);
+        const geo = new THREE.BoxGeometry(0.02, 0.05, length * 0.2);
+        const mat = new THREE.MeshPhongMaterial({ color, emissive: color });
+        const blade = new THREE.Mesh(geo, mat);
+        blade.position.z = -(length * 0.1);
+        parent.add(blade);
+        weaponsInHand[hand] = blade;
+    }
 
-function releaseWeapon(hand) {
-if(!charging[hand]) return;
-const slotIdx = hand === 'right' ? activeSlots.main : activeSlots.sub;
-const weaponId = hand === 'right' ? config.main[slotIdx] : config.sub[slotIdx];
-const weapon = WEAPONS[weaponId];
-const holdTime = charging.time[hand];
-充電[手] = false;
+    function createBulletPre(hand, parent) {
+        const group = new THREE.Group();
+        for(let i=0; i<8; i++) {
+            const b = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.05), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
+            b.position.set(Math.cos(i)*0.2, Math.sin(i)*0.2, -0.1);
+            group.add(b);
+        }
+        parent.add(group);
+        weaponsInHand[hand] = group;
+    }
 
-const controller = hand === 'right' ? controller1 : controller2;
+    function removeHandMesh(hand) {
+        if(weaponsInHand[hand]) {
+            weaponsInHand[hand].parent.remove(weaponsInHand[hand]);
+            weaponsInHand[hand] = null;
+        }
+    }
 
-if(weapon.type === 'sword_std' || weapon.type === 'sword') {
-if(holdTime > 0.5) fireWave(hand, controller, weapon.type === 'sword_std' ? 0xffffff : 0x00ffff);
-それ以外の場合は、performMelee(hand, controller, weapon.damage, weapon.range)を実行します。
-} else if(weapon.type === 'blade') {
-performMelee(hand, controller, weapon.damage, weapon.range);
-} else if(weapon.type === 'bullet') {
-fireBullets(hand, controller);
-}
+    function fireBullets(hand, controller) {
+        const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(controller.quaternion).applyQuaternion(playerGroup.quaternion);
+        const pos = new THREE.Vector3();
+        controller.getWorldPosition(pos);
+        
+        for(let i=0; i<8; i++) {
+            const b = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
+            b.position.copy(pos).add(new THREE.Vector3(Math.random()*0.2, Math.random()*0.2, 0));
+            scene.add(b);
+            bullets.push({ mesh: b, vel: dir.clone().multiplyScalar(0.8), life: 100, damage: 20 });
+        }
+    }
 
-if(weapon.type !== 'shield') {
-removeHandMesh(hand);
-cooldowns[hand] = weapon.cooldown;
-}
-}
+    function fireWave(hand, controller, color) {
+        const geo = new THREE.TorusGeometry(2, 0.05, 8, 24, Math.PI);
+        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 });
+        const wave = new THREE.Mesh(geo, mat);
+        
+        const pos = new THREE.Vector3(); controller.getWorldPosition(pos);
+        wave.position.copy(pos);
+        wave.quaternion.copy(controller.quaternion).multiply(playerGroup.quaternion);
+        scene.add(wave);
+        
+        const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(wave.quaternion);
+        bullets.push({ mesh: wave, vel: dir.multiplyScalar(0.6), life: 60, damage: 100, isWave: true });
+    }
 
-function createShield(hand, parent) {
-removeHandMesh(hand);
-const geo = new THREE.RingGeometry(0.5, 0.6, 32);
-const mat = new THREE.MeshBasicMaterial({ color: 0x00ffff, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
-const shield = new THREE.Mesh(geo, mat);
-shield.rotation.x = Math.PI/2;
-parent.add(shield);
-weaponsInHand[hand] = 盾;
-}
+    function performMelee(hand, controller, damage, range) {
+        const pos = new THREE.Vector3(); controller.getWorldPosition(pos);
+        const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(controller.quaternion).applyQuaternion(playerGroup.quaternion);
+        
+        createSpark(pos.clone().add(dir.multiplyScalar(1)));
 
-function createBladeMesh(hand, parent, color, length) {
-removeHandMesh(hand);
-const geo = new THREE.BoxGeometry(0.02, 0.05, length * 0.2);
-const mat = new THREE.MeshPhongMaterial({ color, emissive: color });
-const blade = new THREE.Mesh(geo, mat);
-blade.position.z = -(length * 0.1);
-parent.add(blade);
-weaponsInHand[hand] = blade;
-}
+        enemies.forEach((e, idx) => {
+            const dist = e.position.distanceTo(pos);
+            if(dist < range) {
+                const toEnemy = e.position.clone().sub(pos).normalize();
+                const dot = toEnemy.dot(dir);
+                if(dot > 0.5) {
+                    e.userData.hp -= damage;
+                    createSpark(e.position);
+                    if(e.userData.hp <= 0) {
+                        scene.remove(e);
+                        enemies.splice(idx, 1);
+                        setTimeout(spawnEnemy, 3000);
+                    }
+                }
+            }
+        });
+    }
 
-function createBulletPre(hand, parent) {
-const group = new THREE.Group();
-for(let i=0; i<8; i++) {
-const b = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.05), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
-b.position.set(Math.cos(i)*0.2, Math.sin(i)*0.2, -0.1);
-group.add(b);
-}
-parent.add(group);
-weaponsInHand[hand] = group;
-}
+    function performJump(hand) {
+        playerVelocity.y = 12;
+        createSpark(playerGroup.position);
+    }
 
-function removeHandMesh(hand) {
-if(weaponsInHand[hand]) {
-weaponsInHand[hand].parent.remove(weaponsInHand[hand]);
-weaponsInHand[hand] = null;
-}
-}
+    function createSpark(pos) {
+        for(let i=0; i<5; i++) {
+            const p = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial({ color: 0x00ffff }));
+            p.position.copy(pos);
+            scene.add(p);
+            particles.push({ mesh: p, vel: new THREE.Vector3((Math.random()-0.5)*0.2, Math.random()*0.2, (Math.random()-0.5)*0.2), life: 20 });
+        }
+    }
 
-function fireBullets(hand, controller) {
-const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(controller.quaternion).applyQuaternion(playerGroup.quaternion);
-const pos = new THREE.Vector3();
-controller.getWorldPosition(pos);
+    function updateHPUI() {
+        document.getElementById('hp-bar').style.width = hp + "%";
+        if(hp <= 0 && !isGameOver) {
+            isGameOver = true;
+            document.getElementById('msg-box').style.display = 'block';
+            setTimeout(() => location.reload(), 3000);
+        }
+    }
 
-for(let i=0; i<8; i++) {
-const b = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
-b.position.copy(pos).add(new THREE.Vector3(Math.random()*0.2, Math.random()*0.2, 0));
-scene.add(b);
-bullets.push({ mesh: b, vel: dir.clone().multiplyScalar(0.8), life: 100, damage: 20 });
-}
-}
+    function render() {
+        const delta = clock.getDelta();
 
-function fireWave(hand, controller, color) {
-const geo = new THREE.TorusGeometry(2, 0.05, 8, 24, Math.PI);
-const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.8 });
-const wave = new THREE.Mesh(geo, mat);
+        // VR Movement
+        if (renderer.xr.isPresenting) {
+            const session = renderer.xr.getSession();
+            if (session && session.inputSources) {
+                for (const source of session.inputSources) {
+                    if (source.gamepad) {
+                        const axes = source.gamepad.axes; // 2: x, 3: y for thumbstick
+                        if (source.handedness === 'left') {
+                            const moveDir = new THREE.Vector3(axes[2], 0, axes[3]).applyQuaternion(playerGroup.quaternion);
+                            playerGroup.position.x += moveDir.x * 5 * delta;
+                            playerGroup.position.z += moveDir.z * 5 * delta;
+                        } else if (source.handedness === 'right') {
+                            playerGroup.rotation.y -= axes[2] * 2 * delta;
+                        }
+                    }
+                }
+            }
+        } else {
+            // Desktop Movement
+            const moveDir = new THREE.Vector3(moveState.right, 0, -moveState.forward).applyQuaternion(playerGroup.quaternion).normalize();
+            playerGroup.position.x += moveDir.x * 10 * delta;
+            playerGroup.position.z += moveDir.z * 10 * delta;
+        }
 
-const pos = new THREE.Vector3(); controller.getWorldPosition(pos);
-wave.position.copy(pos);
-wave.quaternion.copy(controller.quaternion).multiply(playerGroup.quaternion);
-scene.add(wave);
+        // Gravity
+        if (playerGroup.position.y > 0) {
+            playerVelocity.y -= 20 * delta;
+            canJump = false;
+        } else {
+            playerGroup.position.y = 0;
+            playerVelocity.y = 0;
+            canJump = true;
+        }
+        playerGroup.position.y += playerVelocity.y * delta;
 
-const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(wave.quaternion);
-bullets.push({ mesh: wave, vel: dir.multiplyScalar(0.6), life: 60, damage: 100, isWave: true });
-}
+        // Update Systems
+        cooldowns.left = Math.max(0, cooldowns.left - delta);
+        cooldowns.right = Math.max(0, cooldowns.right - delta);
+        if(charging.left) charging.time.left += delta;
+        if(charging.right) charging.time.right += delta;
 
-function performMelee(hand, controller, damage, range) {
-const pos = new THREE.Vector3(); controller.getWorldPosition(pos);
-const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(controller.quaternion).applyQuaternion(playerGroup.quaternion);
+        // Bullets
+        for(let i=bullets.length-1; i>=0; i--) {
+            const b = bullets[i];
+            b.mesh.position.add(b.vel);
+            b.life--;
+            enemies.forEach(e => {
+                if(b.mesh.position.distanceTo(e.position) < 1.5) {
+                    e.userData.hp -= b.damage;
+                    b.life = 0;
+                }
+            });
+            if(b.life <= 0) { scene.remove(b.mesh); bullets.splice(i, 1); }
+        }
 
-createSpark(pos.clone().add(dir.multiplyScalar(1)));
+        // Particles
+        for(let i=particles.length-1; i>=0; i--) {
+            const p = particles[i];
+            p.mesh.position.add(p.vel);
+            p.life--;
+            if(p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); }
+        }
 
-enemies.forEach((e, idx) => {
-const dist = e.position.distanceTo(pos);
-if(dist < range) {
-const toEnemy = e.position.clone().sub(pos).normalize();
-const dot = toEnemy.dot(dir);
-if(dot > 0.5) {
-e.userData.hp -= ダメージ;
-createSpark(e.position);
-if(e.userData.hp <= 0) {
-scene.remove(e);
-enemies.splice(idx, 1);
-setTimeout(spawnEnemy, 3000);
-}
-}
-}
-});
-}
+        // Enemies
+        enemies.forEach(e => {
+            e.lookAt(playerGroup.position);
+            e.userData.shootTimer -= delta;
+            if(e.userData.shootTimer <= 0) {
+                e.userData.shootTimer = 3;
+                // Enemy fire logic simplified for VR
+                const eb = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+                eb.position.copy(e.position);
+                scene.add(eb);
+                const dir = playerGroup.position.clone().sub(e.position).normalize();
+                bullets.push({ mesh: eb, vel: dir.multiplyScalar(0.3), life: 100, damage: 5 });
+            }
+        });
 
-function performJump(hand) {
-playerVelocity.y = 12;
-createSpark(playerGroup.position);
-}
+        renderer.render(scene, camera);
+    }
 
-function createSpark(pos) {
-for(let i=0; i<5; i++) {
-const p = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial({ color: 0x00ffff }));
-p.position.copy(pos);
-scene.add(p);
-particles.push({ mesh: p, vel: new THREE.Vector3((Math.random()-0.5)*0.2, Math.random()*0.2, (Math.random()-0.5)*0.2), life: 20 });
-}
-}
-
-function updateHPUI() {
-document.getElementById('hp-bar').style.width = hp + "%";
-if(hp <= 0 && !isGameOver) {
-isGameOver = true;
-document.getElementById('msg-box').style.display = 'block';
-setTimeout(() => location.reload(), 3000);
-}
-}
-
-function render() {
-const delta = clock.getDelta();
-
-// VRムーブメント
-if (renderer.xr.isPresenting) {
-const session = renderer.xr.getSession();
-if (session && session.inputSources) {
-for (const source of session.inputSources) {
-if (source.gamepad) {
-const axes = source.gamepad.axes; // 2: x、3: y (サムスティック用)
-if (source.handedness === 'left') {
-const moveDir = new THREE.Vector3(axes[2], 0, axes[3]).applyQuaternion(playerGroup.quaternion);
-playerGroup.position.x += moveDir.x * 5 * delta;
-playerGroup.position.z += moveDir.z * 5 * デルタ;
-} else if (source.handedness === 'right') {
-playerGroup.rotation.y -= axes[2] * 2 * delta;
-}
-}
-}
-}
-} それ以外 {
-// デスクトップの動き
-const moveDir = new THREE.Vector3(moveState.right, 0, -moveState.forward).applyQuaternion(playerGroup.quaternion).normalize();
-playerGroup.position.x += moveDir.x * 10 * delta;
-playerGroup.position.z += moveDir.z * 10 * デルタ;
-}
-
-// 重力
-if (playerGroup.position.y > 0) {
-playerVelocity.y -= 20 * delta;
-canJump = false;
-} それ以外 {
-playerGroup.position.y = 0;
-playerVelocity.y = 0;
-canJump = true;
-}
-playerGroup.position.y += playerVelocity.y * delta;
-
-// システムの更新
-cooldowns.left = Math.max(0, cooldowns.left - delta);
-cooldowns.right = Math.max(0, cooldowns.right - delta);
-if(charging.left) charging.time.left += delta;
-if(charging.right) charging.time.right += delta;
-
-// 箇条書き
-for(let i=bullets.length-1; i>=0; i--) {
-const b = bullets[i];
-b.mesh.position.add(b.vel);
-b.人生--;
-enemies.forEach(e => {
-if(b.mesh.position.distanceTo(e.position) < 1.5) {
-e.userData.hp -= b.damage;
-b.life = 0;
-}
-});
-if(b.life <= 0) { scene.remove(b.mesh); bullets.splice(i, 1); }
-}
-
-// 粒子
-for(let i=particles.length-1; i>=0; i--) {
-const p = particles[i];
-p.mesh.position.add(p.vel);
-p.人生--;
-if(p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); }
-}
-
-// 敵
-enemies.forEach(e => {
-e.lookAt(playerGroup.position);
-e.userData.shootTimer -= デルタ;
-if(e.userData.shootTimer <= 0) {
-e.userData.shootTimer = 3;
-// VR向けに敵の射撃ロジックを簡略化
-const eb = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
-eb.position.copy(e.position);
-scene.add(eb);
-const dir = playerGroup.position.clone().sub(e.position).normalize();
-bullets.push({ mesh: eb, vel: dir.multiplyScalar(0.3), life: 100, damage: 5 });
-}
-});
-
-renderer.render(scene, camera);
-}
-
-init();
+    init();
 </script>
 </body>
 </html>
